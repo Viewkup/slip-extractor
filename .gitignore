@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Virtual Environment
+.venv/
+venv/
+.env
+env/
+
+# Flask
+instance/
+.webassets-cache
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS Files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Project-specific files
+# Uploaded files (keep directories, ignore contents)
+uploads/e-slip/*
+uploads/physical/*
+
+# Extraction results
+app_extraction_csv/*
+extraction_results/*
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+temp/
+tmp/
+
+# Configuration with sensitive data
+config.ini
+secrets.py
+
+# Cache
+.cache/
+cache/
+
+# Backup files
+*.bak
+*~ 

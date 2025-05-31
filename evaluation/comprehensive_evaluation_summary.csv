@@ -1,0 +1,5 @@
+bank,total_records,overall_success_rate,transaction_date_missing,transaction_time_missing,amount_missing,from_account_name_missing,to_account_name_missing,to_bank_missing,ref_number_missing
+BANGKOK,12,79.8,0,0,0,3,3,11,0
+KBANK,58,60.6,50,50,7,0,0,50,3
+KRUNGTHAI,18,50.0,13,13,1,1,8,12,15
+SCB,41,59.9,33,33,1,2,11,35,0

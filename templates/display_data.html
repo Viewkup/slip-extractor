@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extracted Data - {{ filename }}</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        /* GLSL Canvas Background Styles */
+        #glslCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1000;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            touch-action: none;
+        }
+        
+        #glslCanvas.show {
+            opacity: 1;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            #glslCanvas {
+                /* Ensure proper mobile rendering */
+                image-rendering: optimizeSpeed;
+                image-rendering: -webkit-optimize-contrast;
+                image-rendering: optimize-contrast;
+            }
+        }
+        
+        @media (orientation: landscape) and (max-height: 500px) {
+            /* Handle landscape mobile orientation */
+            #glslCanvas {
+                height: 100vh;
+                width: 100vw;
+            }
+        }
+
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            background-color: #faf8fa;
+            position: relative;
+        }
+        .container-fluid {
+            /* Changed to container-fluid for more space if needed */
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            margin-top: 20px;
+            -webkit-backdrop-filter: blur(5px);
+            backdrop-filter: blur(5px);
+        }
+        .table-responsive {
+            margin-top: 0; /* Adjusted margin as it's now in a column */
+        }
+        .image-preview-container {
+            margin-bottom: 0; /* Adjusted margin */
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            text-align: center;
+            height: 100%; /* Make container fill column height if desired */
+        }
+        #processedImagePreview {
+            max-width: 100%;
+            max-height: 450px; /* Increased default max height for side view */
+            border: 1px solid #ccc;
+            cursor: zoom-in;
+            transition: max-height 0.3s ease, max-width 0.3s ease;
+        }
+        #processedImagePreview.zoomed {
+            max-width: 90vw;
+            max-height: 90vh;
+            width: auto;
+            height: auto;
+            cursor: zoom-out;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1050;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            overflow: auto;
+        }
+        .data-column h4{
+            margin-top: 0; /* Align heading with top of column */
+        }
+        .alert-purple {
+            color: #6f42c1;
+            background-color: #f3f0ff;
+            border-color: #d1b3ff;
+        }
+        .alert-purple .alert-heading {
+            color: #5a2d8c;
+        }
+        .alert-blue {
+            color: #4a90e2;
+            background-color: #f0f8ff;
+            border-color: #b3d9ff;
+        }
+        .alert-blue .alert-heading {
+            color: #357abd;
+        }
+        .alert-orange {
+            color: #1e3a8a;
+            background-color: #eff6ff;
+            border-color: #93c5fd;
+        }
+        .alert-orange .alert-heading {
+            color: #1e40af;
+        }
+        .alert-teal {
+            color: #16a34a;
+            background-color: #f0fdf4;
+            border-color: #86efac;
+        }
+        .alert-teal .alert-heading {
+            color: #15803d;
+        }
+    </style>
+</head>
+<body>
+    <!-- GLSL Shader Background -->
+    <canvas id="glslCanvas" data-fragment="
+#ifdef GL_ES
+precision lowp float;
+#endif
+
+#define TAU 6.28318530718
+
+uniform vec2 u_resolution;
+uniform vec2 u_mouse;
+uniform float u_time;
+
+float noise(vec2 pos, float a) {
+    return (fract(sin(dot(pos.xy, vec2(12.9898,78.233))) * 43758.5453123) * a) - (a * 0.5) ;
+}
+
+float noiseMod(vec2 pos, float n, float a) {
+    return clamp(n + noise(pos, a), 0.0, 1.0);
+}
+
+float normalSin(float t, float min, float max) {
+    float s = (1.0 + sin(t)) * 0.5;
+    return min + (s * (max - min));
+}
+
+mat2 rotate2d(float _angle){
+    return mat2(cos(_angle),-sin(_angle),
+                sin(_angle),cos(_angle));
+}
+
+vec2 distort(vec2 pos, float angle) {
+    pos -= vec2(0.5);
+    pos *= rotate2d(angle);
+    pos += vec2(0.5);
+    return pos;
+}
+
+void main() {
+	vec2 st = gl_FragCoord.xy/u_resolution;
+    float t = u_time * 0.3;
+
+    // colors //
+    vec3 c1 = vec3(1.0,0.85,0.95);  // soft pastel pink
+    vec3 c2 = vec3(0.85,0.9,1.0);   // soft pastel blue
+    vec3 c3 = vec3(0.95,0.85,1.0);  // soft pastel lavender
+    vec3 c4 = vec3(0.9,0.95,0.85);  // soft pastel mint
+    vec3 bg = vec3(0.98,0.95,0.98);  // very light pastel background
+    vec3 stripe = mix(c2, c1, st.y);
+
+    // rotate distortion //
+    float s1 = normalSin(t + st.x * 6.0, 0.0, 0.5);
+    float s2 = normalSin(t + 5000.0 + (st.x * 15.0), 0.0, 0.5);
+    float s3 = normalSin((t * 0.5) + 15000.0 + (st.x * 2.0), 0.0, 0.5);
+    float angle = ((s1 + s2 + s3) / 3.0) * (TAU * 0.27);
+    st = distort(st, angle);
+
+    // stripe //
+    float amp = normalSin((st.x + st.y) * 20.0, 0.0, 1.0);
+    float aa = 0.01;
+    amp = smoothstep(0.5 - aa, 0.5, amp);
+
+    float amp2 = s1 * 0.5;
+    float amp3 =  s2;
+    vec3 color = mix(bg, stripe, amp);
+    color = mix(color, c3, amp2);
+    color = mix(color, c4, amp3);
+
+	gl_FragColor = vec4(color,1.0);
+}
+                                        "></canvas>
+
+    <div class="container-fluid">
+        <h1 class="mb-4 text-center">Extracted Data for: <small class="text-muted">{{ filename }}</small></h1>
+        
+        <!-- Bank Class Information -->
+        {% if bank_class %}
+        <div class="row mb-4">
+            <div class="col-12">
+                {% set bank_name_map = {
+                    'bangkok': 'Bangkok Bank',
+                    'kbank': 'Kasikornbank (KBank)',
+                    'kasikornbank': 'Kasikornbank (KBank)',
+                    'scb': 'Siam Commercial Bank (SCB)',
+                    'krungthai': 'Krungthai Bank (KTB)'
+                } %}
+                {% set bank_color_map = {
+                    'bangkok': 'orange',
+                    'kbank': 'teal',
+                    'kasikornbank': 'teal',
+                    'scb': 'purple',
+                    'krungthai': 'blue'
+                } %}
+                {% set display_name = bank_name_map.get(bank_class.lower(), bank_class.title()) %}
+                {% set alert_color = bank_color_map.get(bank_class.lower(), 'info') %}
+                
+                <div class="alert alert-{{ alert_color }} text-center">
+                    <h4 class="alert-heading mb-2">
+                        <i class="fas fa-university"></i> Detected Bank
+                    </h4>
+                    <p class="mb-1">
+                        <strong>{{ display_name }}</strong>
+                    </p>
+                    <small class="text-muted">
+                        {% if slip_type == 'physical' %}
+                            Detected via YOLO object detection model
+                        {% else %}
+                            Detected via logo template matching and FLANN matching
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="row">
+            <!-- Image Preview Column -->
+            <div class="col-md-5">
+                {% if filename %}
+                <div class="image-preview-container">
+                    <h4>Image Preview:</h4>
+                    <img id="processedImagePreview" src="{{ url_for('serve_upload_for_preview', slip_type=slip_type, filename=filename) }}" alt="Preview of {{ filename }}">
+                </div>
+                {% else %}
+                <div class="image-preview-container">
+                    <p class="text-muted">No image to preview.</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Data Table Column -->
+            <div class="col-md-7 data-column">
+                {% if error_message %}
+                    <div class="alert alert-danger">Error: {{ error_message }}</div>
+                {% elif data_html %}
+                    <h4>Extracted Details:</h4>
+                    <div class="table-responsive">
+                        {{ data_html | safe }}
+                    </div>
+                {% else %}
+                    <div class="alert alert-warning">No data extracted or available to display.</div>
+                {% endif %}
+                
+                <!-- Raw OCR Text Section -->
+                {% if raw_ocr %}
+                <div class="mt-4">
+                    <h5>
+                        <button class="btn btn-outline-secondary btn-sm" type="button" data-toggle="collapse" data-target="#rawOcrCollapse" aria-expanded="false" aria-controls="rawOcrCollapse">
+                            <i class="fas fa-eye"></i> Show/Hide Raw OCR Text
+                        </button>
+                    </h5>
+                    <div class="collapse" id="rawOcrCollapse">
+                        <div class="card card-body mt-2">
+                            <h6 class="text-muted">Raw OCR Output:</h6>
+                            <pre class="bg-light p-3 border rounded" style="max-height: 300px; overflow-y: auto; white-space: pre-wrap; font-size: 0.9em;">{{ raw_ocr }}</pre>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="text-center mt-4">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Upload Page</a>
+        </div>
+    </div>
+
+    <script src="https://rawgit.com/patriciogonzalezvivo/glslCanvas/master/dist/GlslCanvas.js"></script>
+    <script>
+        // Initialize GLSL Canvas Background with responsive handling
+        var canvas = document.getElementById("glslCanvas");
+        var sandbox;
+        
+        // Debounce function for performance optimization
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+        
+        // Set canvas resolution with device pixel ratio for crisp rendering
+        function setCanvasResolution() {
+            if (!canvas) return;
+            
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            
+            // Set actual canvas size
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            
+            // Scale canvas back down using CSS
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+            
+            // Re-initialize shader if it exists
+            if (sandbox) {
+                sandbox.load(canvas.getAttribute('data-fragment'));
+            }
+        }
+        
+        // Responsive resize handler with debouncing
+        const debouncedResize = debounce(() => {
+            setCanvasResolution();
+        }, 150);
+        
+        // Handle various resize events for full responsiveness
+        window.addEventListener('resize', debouncedResize);
+        window.addEventListener('orientationchange', () => {
+            // Add small delay for orientation change to complete
+            setTimeout(debouncedResize, 100);
+        });
+        
+        // Initialize canvas and shader
+        function initializeBackground() {
+            setCanvasResolution();
+            sandbox = new GlslCanvas(canvas);
+            
+            // Show canvas with fade-in effect
+            setTimeout(() => {
+                canvas.classList.add('show');
+            }, 100);
+        }
+        
+        // Wait for DOM and initialize
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeBackground);
+        } else {
+            initializeBackground();
+        }
+        
+        // Handle visibility changes for performance
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // Pause animations when tab is hidden (browser optimization)
+                if (sandbox && sandbox.pause) sandbox.pause();
+            } else {
+                // Resume when tab becomes visible
+                if (sandbox && sandbox.play) sandbox.play();
+            }
+        });
+
+        // Existing JavaScript for image preview
+        const processedPreviewImg = document.getElementById('processedImagePreview');
+        if (processedPreviewImg) {
+            processedPreviewImg.addEventListener('click', function() {
+                this.classList.toggle('zoomed');
+            });
+        }
+    </script>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html> 

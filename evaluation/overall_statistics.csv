@@ -1,0 +1,8 @@
+column,total_records,total_missing,success_rate,status
+transaction_date,129,96,25.6,Poor
+transaction_time,129,96,25.6,Poor
+amount,129,9,93.0,Good
+from_account_name,129,6,95.3,Excellent
+to_account_name,129,22,82.9,Good
+to_bank,129,108,16.3,Poor
+ref_number,129,18,86.0,Good

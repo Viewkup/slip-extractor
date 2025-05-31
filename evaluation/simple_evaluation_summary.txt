@@ -1,0 +1,55 @@
+SIMPLE E-SLIP EXTRACTION EVALUATION
+==================================================
+
+MISSING DATA COUNT BY BANK:
+
+BANGKOK BANK (12 records):
+  transaction_date: 0/12 missing (100.0% success)
+  transaction_time: 0/12 missing (100.0% success)
+  amount: 0/12 missing (100.0% success)
+  from_account_name: 3/12 missing (75.0% success)
+  to_account_name: 3/12 missing (75.0% success)
+  to_bank: 11/12 missing (8.3% success)
+  ref_number: 0/12 missing (100.0% success)
+
+KBANK BANK (58 records):
+  transaction_date: 50/58 missing (13.8% success)
+  transaction_time: 50/58 missing (13.8% success)
+  amount: 7/58 missing (87.9% success)
+  from_account_name: 0/58 missing (100.0% success)
+  to_account_name: 0/58 missing (100.0% success)
+  to_bank: 50/58 missing (13.8% success)
+  ref_number: 3/58 missing (94.8% success)
+
+KRUNGTHAI BANK (18 records):
+  transaction_date: 13/18 missing (27.8% success)
+  transaction_time: 13/18 missing (27.8% success)
+  amount: 1/18 missing (94.4% success)
+  from_account_name: 1/18 missing (94.4% success)
+  to_account_name: 8/18 missing (55.6% success)
+  to_bank: 12/18 missing (33.3% success)
+  ref_number: 15/18 missing (16.7% success)
+
+SCB BANK (41 records):
+  transaction_date: 33/41 missing (19.5% success)
+  transaction_time: 33/41 missing (19.5% success)
+  amount: 1/41 missing (97.6% success)
+  from_account_name: 2/41 missing (95.1% success)
+  to_account_name: 11/41 missing (73.2% success)
+  to_bank: 35/41 missing (14.6% success)
+  ref_number: 0/41 missing (100.0% success)
+
+FIELD PERFORMANCE RANKING:
+  #1 from_account_name: 95.3% success
+  #2 amount: 93.0% success
+  #3 ref_number: 86.0% success
+  #4 to_account_name: 82.9% success
+  #5 transaction_date: 25.6% success
+  #6 transaction_time: 25.6% success
+  #7 to_bank: 16.3% success
+
+BANK PERFORMANCE RANKING:
+  #1 BANGKOK: 79.8% overall success
+  #2 KBANK: 60.6% overall success
+  #3 SCB: 59.9% overall success
+  #4 KRUNGTHAI: 50.0% overall success

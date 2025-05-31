@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slip Extractor</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        /* GLSL Canvas Background Styles */
+        #glslCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1000;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            touch-action: none;
+        }
+        
+        #glslCanvas.show {
+            opacity: 1;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            #glslCanvas {
+                /* Ensure proper mobile rendering */
+                image-rendering: optimizeSpeed;
+                image-rendering: -webkit-optimize-contrast;
+                image-rendering: optimize-contrast;
+            }
+        }
+        
+        @media (orientation: landscape) and (max-height: 500px) {
+            /* Handle landscape mobile orientation */
+            #glslCanvas {
+                height: 100vh;
+                width: 100vw;
+            }
+        }
+
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            background-color: #faf8fa;
+            position: relative;
+        }
+        .container {
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            /* max-width: 800px; Removed max-width to allow for wider layout if needed */
+            margin: 40px auto;
+            -webkit-backdrop-filter: blur(5px);
+            backdrop-filter: blur(5px);
+        }
+        .upload-form {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: rgba(233, 236, 239, 0.9);
+            border-radius: 8px;
+        }
+        .files-list-section, .preview-section {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: rgba(248, 249, 250, 0.9);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            min-height: 300px; /* Give some min height */
+        }
+        .files-list-section h2, .preview-section h2, .files-list-section h3 {
+            margin-bottom: 15px;
+        }
+        #imagePreview {
+            max-width: 100%;
+            max-height: 400px; /* Default max height */
+            display: block;
+            margin: 0 auto;
+            border: 1px solid #ddd;
+            padding: 5px;
+            background-color: #fff;
+            cursor: zoom-in; /* Indicate zoomable */
+            transition: max-height 0.3s ease, max-width 0.3s ease; /* Smooth transition */
+        }
+        #imagePreview.zoomed {
+            max-width: none; /* Allow full width */
+            max-height: none; /* Allow full height */
+            width: auto; 
+            height: auto;
+            cursor: zoom-out;
+            position: fixed; /* For overlay effect */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1050; /* Above other content */
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            /* Add overflow for scrolling when zoomed and larger than viewport */
+            overflow: auto; 
+            /* To make overflow work correctly with fixed positioning and transform, 
+               we might need to constrain the dimensions of the zoomed image to the viewport. 
+               Let's try adding max-width and max-height for the viewport here. */
+            max-width: 90vw; /* 90% of viewport width */
+            max-height: 90vh; /* 90% of viewport height */
+        }
+        .list-group-item a.filename-link {
+            cursor: pointer;
+            color: #007bff;
+        }
+        .list-group-item a.filename-link:hover {
+            text-decoration: underline;
+        }
+        /* Spinner Overlay Styles */
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.7);
+            z-index: 1100; /* Higher than zoomed image */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .action-buttons form {
+            display: inline-block; /* Keep buttons on the same line */
+            margin-left: 5px;
+        }
+        .filename-link i {
+            margin-right: 8px; /* Space between icon and filename */
+        }
+        .slip-type-selection {
+            margin: 25px 0;
+        }
+        
+        .slip-type-selection .form-check {
+            margin-right: 15px;
+        }
+        
+        .slip-type-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .slip-type-card {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .slip-type-card:hover {
+            border-color: #007bff;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 123, 255, 0.15);
+        }
+        
+        .slip-type-card.selected {
+            border-color: #28a745;
+            background: linear-gradient(135deg, rgba(40, 167, 69, 0.1) 0%, rgba(40, 167, 69, 0.05) 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.2);
+        }
+        
+        .slip-type-card.selected::before {
+            content: '✓';
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: #28a745;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .slip-type-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            color: #6c757d;
+            transition: color 0.3s ease;
+        }
+        
+        .slip-type-card:hover .slip-type-icon {
+            color: #007bff;
+        }
+        
+        .slip-type-card.selected .slip-type-icon {
+            color: #28a745;
+        }
+        
+        .slip-type-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #495057;
+            transition: color 0.3s ease;
+        }
+        
+        .slip-type-card.selected .slip-type-title {
+            color: #28a745;
+        }
+        
+        .slip-type-description {
+            font-size: 0.9rem;
+            color: #6c757d;
+            line-height: 1.4;
+        }
+        
+        .slip-type-input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .section-title i {
+            margin-right: 10px;
+            color: #007bff;
+        }
+        .drag-drop-zone {
+            border: 2px dashed #6c757d;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: rgba(248, 249, 250, 0.8);
+            cursor: pointer;
+            position: relative;
+            margin-bottom: 20px;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .drag-drop-zone:hover {
+            border-color: #007bff;
+            background: rgba(0, 123, 255, 0.05);
+        }
+        
+        .drag-drop-zone.drag-over {
+            border-color: #28a745;
+            background: rgba(40, 167, 69, 0.1);
+            transform: scale(1.02);
+        }
+        
+        .drag-drop-zone.has-file {
+            border-color: #28a745;
+            background: rgba(40, 167, 69, 0.05);
+            padding: 20px;
+        }
+        
+        .drag-drop-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .drag-drop-zone.has-file .drag-drop-content {
+            display: none;
+        }
+        
+        .image-preview-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+        
+        .drag-drop-zone.has-file .image-preview-container {
+            display: flex;
+        }
+        
+        .drag-drop-preview-image {
+            max-width: 100%;
+            max-height: 250px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            margin-bottom: 15px;
+            object-fit: contain;
+        }
+        
+        .change-file-btn {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #6c757d;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+        
+        .change-file-btn:hover {
+            background: white;
+            border-color: #007bff;
+            color: #007bff;
+        }
+        
+        .drag-drop-text {
+            font-size: 1.1rem;
+            color: #6c757d;
+            margin-bottom: 10px;
+        }
+        
+        .drag-drop-zone.drag-over .drag-drop-text {
+            color: #28a745;
+        }
+        
+        .file-input-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0,0,0,0);
+            white-space: nowrap;
+            border: 0;
+        }
+        
+        .selected-file-info {
+            background: rgba(40, 167, 69, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            display: none;
+        }
+        
+        .selected-file-info.show {
+            display: block;
+        }
+        
+        .file-info-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .file-info-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .file-info-icon {
+            color: #28a745;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <!-- GLSL Shader Background -->
+    <canvas id="glslCanvas" data-fragment="
+#ifdef GL_ES
+precision lowp float;
+#endif
+
+#define TAU 6.28318530718
+
+uniform vec2 u_resolution;
+uniform vec2 u_mouse;
+uniform float u_time;
+
+float noise(vec2 pos, float a) {
+    return (fract(sin(dot(pos.xy, vec2(12.9898,78.233))) * 43758.5453123) * a) - (a * 0.5) ;
+}
+
+float noiseMod(vec2 pos, float n, float a) {
+    return clamp(n + noise(pos, a), 0.0, 1.0);
+}
+
+float normalSin(float t, float min, float max) {
+    float s = (1.0 + sin(t)) * 0.5;
+    return min + (s * (max - min));
+}
+
+mat2 rotate2d(float _angle){
+    return mat2(cos(_angle),-sin(_angle),
+                sin(_angle),cos(_angle));
+}
+
+vec2 distort(vec2 pos, float angle) {
+    pos -= vec2(0.5);
+    pos *= rotate2d(angle);
+    pos += vec2(0.5);
+    return pos;
+}
+
+void main() {
+	vec2 st = gl_FragCoord.xy/u_resolution;
+    float t = u_time * 0.3;
+
+    // colors //
+    vec3 c1 = vec3(1.0,0.85,0.95);  // soft pastel pink
+    vec3 c2 = vec3(0.85,0.9,1.0);   // soft pastel blue
+    vec3 c3 = vec3(0.95,0.85,1.0);  // soft pastel lavender
+    vec3 c4 = vec3(0.9,0.95,0.85);  // soft pastel mint
+    vec3 bg = vec3(0.98,0.95,0.98);  // very light pastel background
+    vec3 stripe = mix(c2, c1, st.y);
+
+    // rotate distortion //
+    float s1 = normalSin(t + st.x * 6.0, 0.0, 0.5);
+    float s2 = normalSin(t + 5000.0 + (st.x * 15.0), 0.0, 0.5);
+    float s3 = normalSin((t * 0.5) + 15000.0 + (st.x * 2.0), 0.0, 0.5);
+    float angle = ((s1 + s2 + s3) / 3.0) * (TAU * 0.27);
+    st = distort(st, angle);
+
+    // stripe //
+    float amp = normalSin((st.x + st.y) * 20.0, 0.0, 1.0);
+    float aa = 0.01;
+    amp = smoothstep(0.5 - aa, 0.5, amp);
+
+    float amp2 = s1 * 0.5;
+    float amp3 =  s2;
+    vec3 color = mix(bg, stripe, amp);
+    color = mix(color, c3, amp2);
+    color = mix(color, c4, amp3);
+
+	gl_FragColor = vec4(color,1.0);
+}
+                                        "></canvas>
+
+    <!-- Loading Spinner Overlay -->
+    <div id="loadingOverlay" style="display: none;">
+        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+            <span class="sr-only">Loading...</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1 class="mb-4 text-center">Slip Extractor</h1>
+
+        <!-- Upload Form -->
+        <div class="upload-form">
+            <h2 class="text-center">Upload Slip Image</h2>
+            <form method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data" id="uploadForm">
+                <div class="drag-drop-zone" id="dragDropZone">
+                    <input type="file" name="file" id="file" class="file-input-hidden" accept="image/*" required title="Choose image file">
+                    <div class="drag-drop-content" id="dragDropContent">
+                        <i class="bi bi-cloud-upload" style="font-size: 3rem; color: #6c757d; margin-bottom: 15px;"></i>
+                        <p class="drag-drop-text">Drag and drop image here or click to upload</p>
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="browseBtn">Browse Files</button>
+                    </div>
+                    <div class="image-preview-container" id="imagePreviewContainer">
+                        <img id="dragDropImagePreview" src="" alt="Selected image preview" class="drag-drop-preview-image">
+                        <button type="button" class="btn change-file-btn" id="changeFileBtn">
+                            <i class="bi bi-arrow-clockwise"></i> Change File
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="selected-file-info" id="selectedFileInfo">
+                    <div class="file-info-item">
+                        <i class="fas fa-file-image file-info-icon"></i>
+                        <span id="fileName">No file selected</span>
+                    </div>
+                    <div class="file-info-item">
+                        <i class="fas fa-weight-hanging file-info-icon"></i>
+                        <span id="fileSize">0 KB</span>
+                    </div>
+                    <div class="file-info-item">
+                        <i class="fas fa-calendar file-info-icon"></i>
+                        <span id="fileDate">-</span>
+                    </div>
+                </div>
+                
+                <div class="slip-type-selection">
+                    <div class="section-title">
+                        <i class="fas fa-layer-group"></i>
+                        Select Slip Type
+                    </div>
+                    <div class="slip-type-cards">
+                        <div class="slip-type-card selected" data-slip-type="e-slip">
+                            <input type="radio" name="slip_type" id="eSlipRadio" value="e-slip" class="slip-type-input" checked>
+                            <div class="slip-type-icon">
+                                <i class="bi bi-phone"></i>
+                            </div>
+                            <div class="slip-type-title">E-Slip</div>
+                            <div class="slip-type-description">Digital payment slips from mobile banking apps or online transactions</div>
+                        </div>
+                        
+                        <div class="slip-type-card" data-slip-type="physical">
+                            <input type="radio" name="slip_type" id="physicalSlipRadio" value="physical" class="slip-type-input">
+                            <div class="slip-type-icon">
+                                <i class="bi bi-receipt"></i>
+                            </div>
+                            <div class="slip-type-title">Physical Slip</div>
+                            <div class="slip-type-description">Printed paper receipts from ATMs, banks, or payment terminals</div>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block" id="uploadButton" disabled>Upload</button>
+            </form>
+        </div>
+
+        <!-- Extract All Data Section -->
+        <div class="text-center mb-4">
+            <div class="alert alert-info">
+                <h5 class="alert-heading mb-2">
+                    <i class="bi bi-download"></i> Bulk Data Extraction
+                </h5>
+                <p class="mb-2">Extract data from all uploaded files and export to CSV format</p>
+                <form method="POST" action="{{ url_for('extract_all_data') }}" onsubmit="return confirmExtractAll();">
+                    <button type="submit" class="btn btn-success btn-lg extract-all-btn">
+                        <i class="bi bi-file-earmark-arrow-down"></i> Extract All Data
+                    </button>
+                </form>
+                <div class="mt-2">
+                    <a href="{{ url_for('view_results') }}" class="btn btn-info btn-md">
+                        <i class="bi bi-table"></i> View Extraction Results
+                    </a>
+                </div>
+                <small class="text-muted mt-2 d-block">
+                    Results will be saved to the <code>app_extraction_csv/</code> folder with timestamp
+                </small>
+            </div>
+        </div>
+
+        {% if message %}
+            <div class="alert alert-info text-center">{{ message }}</div>
+        {% endif %}
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="files-list-section">
+                    <h2 class="text-center">Uploaded Files</h2>
+                    
+                    <h3>E-Slips</h3>
+                    {% if e_slip_files %}
+                        <ul class="list-group mb-3">
+                            {% for filename in e_slip_files %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <a class="filename-link mr-auto" onclick="showPreview('e-slip', '{{ filename }}')">
+                                        <i class="bi bi-receipt"></i> {{ filename }}
+                                    </a>
+                                    <div class="action-buttons">
+                                        <a href="{{ url_for('process_e_slip_route', filename=filename) }}" class="btn btn-sm btn-success process-file-btn">Process</a>
+                                        <form method="POST" action="{{ url_for('delete_file_route', slip_type='e-slip', filename=filename) }}" onsubmit="return confirmDelete('e-slip', '{{ filename }}');">
+                                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                        </form>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-center text-muted">No e-slips uploaded yet.</p>
+                    {% endif %}
+
+                    <h3>Physical Slips</h3>
+                    {% if physical_slip_files %}
+                        <ul class="list-group">
+                            {% for filename in physical_slip_files %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <a class="filename-link mr-auto" onclick="showPreview('physical', '{{ filename }}')">
+                                        <i class="bi bi-printer"></i> {{ filename }}
+                                    </a>
+                                    <div class="action-buttons">
+                                        <a href="{{ url_for('process_physical_slip_route', filename=filename) }}" class="btn btn-sm btn-info process-file-btn">Process</a>
+                                        <form method="POST" action="{{ url_for('delete_file_route', slip_type='physical', filename=filename) }}" onsubmit="return confirmDelete('physical', '{{ filename }}');">
+                                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                        </form>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-center text-muted">No physical slips uploaded yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="preview-section">
+                    <h2 class="text-center">Preview</h2>
+                    <img id="imagePreview" src="#" alt="Image preview will appear here" style="display: none;"/>
+                    <p id="noPreviewText" class="text-center text-muted">Click on a filename to preview.</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://rawgit.com/patriciogonzalezvivo/glslCanvas/master/dist/GlslCanvas.js"></script>
+    <script>
+        // Initialize GLSL Canvas Background with responsive handling
+        var canvas = document.getElementById("glslCanvas");
+        var sandbox;
+        
+        // Debounce function for performance optimization
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+        
+        // Set canvas resolution with device pixel ratio for crisp rendering
+        function setCanvasResolution() {
+            if (!canvas) return;
+            
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            
+            // Set actual canvas size
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            
+            // Scale canvas back down using CSS
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+            
+            // Re-initialize shader if it exists
+            if (sandbox) {
+                sandbox.load(canvas.getAttribute('data-fragment'));
+            }
+        }
+        
+        // Responsive resize handler with debouncing
+        const debouncedResize = debounce(() => {
+            setCanvasResolution();
+        }, 150);
+        
+        // Handle various resize events for full responsiveness
+        window.addEventListener('resize', debouncedResize);
+        window.addEventListener('orientationchange', () => {
+            // Add small delay for orientation change to complete
+            setTimeout(debouncedResize, 100);
+        });
+        
+        // Initialize canvas and shader
+        function initializeBackground() {
+            setCanvasResolution();
+            sandbox = new GlslCanvas(canvas);
+            
+            // Show canvas with fade-in effect
+            setTimeout(() => {
+                canvas.classList.add('show');
+            }, 100);
+        }
+        
+        // Wait for DOM and initialize
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeBackground);
+        } else {
+            initializeBackground();
+        }
+        
+        // Handle visibility changes for performance
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // Pause animations when tab is hidden (browser optimization)
+                if (sandbox && sandbox.pause) sandbox.pause();
+            } else {
+                // Resume when tab becomes visible
+                if (sandbox && sandbox.play) sandbox.play();
+            }
+        });
+
+        // Existing JavaScript for the application
+        const previewImg = document.getElementById('imagePreview');
+        const noPreviewText = document.getElementById('noPreviewText');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+
+        // Drag and Drop Functionality
+        const dragDropZone = document.getElementById('dragDropZone');
+        const fileInput = document.getElementById('file');
+        const browseBtn = document.getElementById('browseBtn');
+        const selectedFileInfo = document.getElementById('selectedFileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const fileDate = document.getElementById('fileDate');
+        const uploadButton = document.getElementById('uploadButton');
+        const dragDropContent = document.getElementById('dragDropContent');
+        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+        const dragDropImagePreview = document.getElementById('dragDropImagePreview');
+        const changeFileBtn = document.getElementById('changeFileBtn');
+
+        // File validation
+        function validateFile(file) {
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/heic'];
+            const maxSize = 10 * 1024 * 1024; // 10MB
+
+            if (!allowedTypes.includes(file.type)) {
+                alert('Please select a valid image file (JPEG, PNG, GIF, WebP, or HEIC)');
+                return false;
+            }
+
+            if (file.size > maxSize) {
+                alert('File size must be less than 10MB');
+                return false;
+            }
+
+            return true;
+        }
+
+        // Format file size
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Show image preview
+        function showImagePreview(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                dragDropImagePreview.src = e.target.result;
+                dragDropZone.classList.add('has-file');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Update file info display
+        function updateFileInfo(file) {
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            fileDate.textContent = new Date(file.lastModified).toLocaleDateString();
+            selectedFileInfo.classList.add('show');
+            uploadButton.disabled = false;
+            
+            // Show image preview
+            showImagePreview(file);
+        }
+
+        // Clear file info
+        function clearFileInfo() {
+            selectedFileInfo.classList.remove('show');
+            dragDropZone.classList.remove('has-file');
+            uploadButton.disabled = true;
+            fileInput.value = '';
+            dragDropImagePreview.src = '';
+        }
+
+        // Handle file selection
+        function handleFileSelect(file) {
+            if (validateFile(file)) {
+                updateFileInfo(file);
+            } else {
+                clearFileInfo();
+            }
+        }
+
+        // Browse button click
+        browseBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Change file button click
+        changeFileBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Drag drop zone click (only when no file is selected)
+        dragDropZone.addEventListener('click', (e) => {
+            if (e.target !== browseBtn && e.target !== changeFileBtn && !dragDropZone.classList.contains('has-file')) {
+                fileInput.click();
+            }
+        });
+
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                handleFileSelect(file);
+            } else {
+                clearFileInfo();
+            }
+        });
+
+        // Drag and drop events
+        dragDropZone.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            dragDropZone.classList.add('drag-over');
+        });
+
+        dragDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dragDropZone.classList.add('drag-over');
+        });
+
+        dragDropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            if (!dragDropZone.contains(e.relatedTarget)) {
+                dragDropZone.classList.remove('drag-over');
+            }
+        });
+
+        dragDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragDropZone.classList.remove('drag-over');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                fileInput.files = files;
+                handleFileSelect(file);
+            }
+        });
+
+        // Prevent default drag behaviors on document
+        document.addEventListener('dragenter', (e) => e.preventDefault());
+        document.addEventListener('dragover', (e) => e.preventDefault());
+        document.addEventListener('drop', (e) => e.preventDefault());
+
+        function showPreview(slipType, filename) {
+            previewImg.src = "{{ url_for('serve_upload_for_preview', slip_type='__TYPE__', filename='__FILE__') }}".replace('__TYPE__', slipType).replace('__FILE__', filename);
+            previewImg.style.display = 'block';
+            previewImg.classList.remove('zoomed'); 
+            noPreviewText.style.display = 'none';
+        }
+
+        previewImg.addEventListener('click', function() { this.classList.toggle('zoomed'); });
+
+        const justUploadedFile = "{{ uploaded_filename_param or '' }}";
+        const justUploadedType = "{{ slip_type_param or '' }}";
+        if (justUploadedFile && justUploadedType) {
+            showPreview(justUploadedType, justUploadedFile);
+        }
+
+        const processButtons = document.querySelectorAll('.process-file-btn');
+        processButtons.forEach(button => {
+            button.addEventListener('click', function() { loadingOverlay.style.display = 'flex'; });
+        });
+
+        function confirmDelete(slipType, filename) {
+            if (confirm('Are you sure you want to delete ' + slipType + ' "' + filename + '"?')) {
+                loadingOverlay.style.display = 'flex';
+                return true;
+            }
+            return false;
+        }
+
+        function confirmExtractAll() {
+            const totalFiles = {{ (e_slip_files|length) + (physical_slip_files|length) }};
+            if (totalFiles === 0) {
+                alert('No files uploaded yet. Please upload some files first.');
+                return false;
+            }
+            
+            if (confirm('Are you sure you want to extract data from all ' + totalFiles + ' uploaded files? This may take a while.')) {
+                loadingOverlay.style.display = 'flex';
+                return true;
+            }
+            return false;
+        }
+
+        // Add loading state for extract all button
+        const extractAllButton = document.querySelector('.extract-all-btn');
+        if (extractAllButton) {
+            extractAllButton.addEventListener('click', function() {
+                setTimeout(() => {
+                    loadingOverlay.style.display = 'flex';
+                }, 100);
+            });
+        }
+
+        // Modern Slip Type Selection
+        const slipTypeCards = document.querySelectorAll('.slip-type-card');
+        const slipTypeInputs = document.querySelectorAll('.slip-type-input');
+
+        // Handle slip type card selection
+        slipTypeCards.forEach(card => {
+            card.addEventListener('click', () => {
+                const slipType = card.dataset.slipType;
+                const radioInput = card.querySelector('.slip-type-input');
+                
+                // Remove selected class from all cards
+                slipTypeCards.forEach(c => c.classList.remove('selected'));
+                
+                // Add selected class to clicked card
+                card.classList.add('selected');
+                
+                // Check the corresponding radio input
+                radioInput.checked = true;
+                
+                // Trigger change event for any listeners
+                radioInput.dispatchEvent(new Event('change'));
+            });
+        });
+
+        // Handle direct radio input changes (for accessibility)
+        slipTypeInputs.forEach(input => {
+            input.addEventListener('change', () => {
+                if (input.checked) {
+                    const slipType = input.value;
+                    const targetCard = document.querySelector(`[data-slip-type="${slipType}"]`);
+                    
+                    // Remove selected class from all cards
+                    slipTypeCards.forEach(c => c.classList.remove('selected'));
+                    
+                    // Add selected class to the corresponding card
+                    if (targetCard) {
+                        targetCard.classList.add('selected');
+                    }
+                }
+            });
+        });
+    </script>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html> 

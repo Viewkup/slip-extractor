@@ -1,0 +1,13 @@
+Flask
+Werkzeug
+pillow-heif
+Pillow
+easyocr
+pytesseract
+pandas
+matplotlib
+numpy
+opencv-python
+ultralytics
+imutils
+requests
